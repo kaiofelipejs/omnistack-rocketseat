@@ -1,5 +1,6 @@
 import React, { Component } from 'react';
 import api from '../services/api';
+import io from 'socket.io-client';
 
 import { View, Image, StyleSheet, Text,TouchableOpacity } from 'react-native';
 
@@ -9,7 +10,6 @@ import like from '../assets/like.png';
 import comment from '../assets/comment.png';
 import send from '../assets/send.png';
 import { FlatList } from 'react-native-gesture-handler';
-import { bold } from 'ansi-colors';
 
 export default class Feed extends Component {
   static navigationOptions = ({ navigation }) => ({
@@ -25,7 +25,7 @@ export default class Feed extends Component {
   };
 
   async componentDidMount() {
-    //this.registerToSocket();
+    this.registerToSocket();
 
     const response = await api.get('posts');
 
@@ -33,53 +33,72 @@ export default class Feed extends Component {
 
     this.setState({ feed: response.data })
   }
+
+  registerToSocket = () => {
+    const socket = io('http://10.0.3.2:3333');
+
+    //post, like
+
+    socket.on('post', newPost => {
+        this.setState({ feed: [newPost, ...this.state.feed] });
+    })
+
+    socket.on('like', likedPost => {
+        this.setState({ 
+            feed: this.state.feed.map(post =>
+                post._id === likedPost._id ? likedPost : post
+            )
+         })
+    })
+}
+
+handleLike = id => {
+  api.post(`/posts/${id}/like`); 
+}
   
-    render() {
-    return (
-      <View style={styles.container}>
-        <FlatList
-          data={this.state.feed}
-          keyExtractor={post => post._id}
-          renderItem={({ item }) => (
-            <View style={styles.feedItem}>
+render() {
+  return (
+    <View style={styles.container}>
+      <FlatList
+        data={this.state.feed}
+        keyExtractor={post => post._id}
+        renderItem={({ item }) => (
+          <View style={styles.feedItem}>
 
-              <View style={styles.feedItemHeader}>
-                <View style={styles.userInfo}>
-                  <Text style={styles.name}>{item.author}</Text>
-                  <Text style={styles.place}>{item.place}</Text>
-                </View>
-
-                <Image source={more} />
-
+            <View style={styles.feedItemHeader}>
+              <View style={styles.userInfo}>
+                <Text style={styles.name}>{item.author}</Text>
+                <Text style={styles.place}>{item.place}</Text>
               </View>
 
-                <Image style={styles.feedImage} source={{ uri: `http://10.0.3.2:3333/files/${item.image}` }} />
-              
-                <View style={styles.feedItemFooter}>
-                  <View style={styles.actions}>
-                    <TouchableOpacity style={styles.action} onPress={() => {}}>
-                      <Image source={like} />
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.action} onPress={() => {}}>
-                      <Image source={comment} />
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.action} onPress={() => {}}>
-                      <Image source={send} />
-                    </TouchableOpacity>
-                  </View>
-
-                  <Text style={styles.likes}>{item.likes}</Text>
-                  <Text style={styles.description}>{item.description}</Text>
-                  <Text style={styles.hashtags}>{item.hashtags}</Text>
-                </View>
+              <Image source={more} />
             </View>
-            
-          )}
-        />
-      </View>
-    )
-  }
-}
+
+            <Image style={styles.feedImage} source={{ uri: `http://10.0.3.2:3333/files/${item.image}` }} />
+          
+            <View style={styles.feedItemFooter}>
+              <View style={styles.actions}>
+                <TouchableOpacity style={styles.action} onPress={() => this.handleLike(item._id)}>
+                  <Image source={like} />
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.action} onPress={() => {}}>
+                  <Image source={comment} />
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.action} onPress={() => {}}>
+                  <Image source={send} />
+                </TouchableOpacity>
+              </View>
+
+              <Text style={styles.likes}>{item.likes} curtidas</Text>
+              <Text style={styles.description}>{item.description}</Text>
+              <Text style={styles.hashtags}>{item.hashtags}</Text>
+            </View>
+          </View>
+          
+        )}
+      />
+    </View>
+)}};
 
 const styles = StyleSheet.create({
   container: {
